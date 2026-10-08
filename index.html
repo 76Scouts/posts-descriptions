@@ -105,6 +105,29 @@
   .toast.show{opacity:1}
   .toast.err{background:var(--err)}
   .hidden{display:none!important}
+  .search{flex:1;min-width:180px;max-width:340px;padding:7px 11px;border:1px solid var(--line);border-radius:9px;font-size:14px;background:#fff;color:var(--ink)}
+  .chip[data-k="Σύστημα"].active{background:var(--blue);border-color:var(--blue)}
+  .datehead{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+  .badge{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:12px;text-decoration:none;white-space:nowrap}
+  .badge.ok{background:#dcf6e4;color:#1c7a3d}
+  .badge.warn{background:#fff3d6;color:#8a6100}
+  .badge.miss{background:#fde8e8;color:#b42318}
+  .panel{padding:12px 16px}
+  .panel .ptitle{font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .panel.pend{border-left:5px solid var(--warn)}
+  .panel.done{border-left:5px solid var(--ok)}
+  .panel.done .ptitle{margin:0;color:#1c7a3d}
+  .panel .btn{margin-top:10px}
+  .wkrow{display:flex;gap:8px;flex-wrap:wrap}
+  .wk{font-size:13px;font-weight:700;padding:4px 11px;border-radius:14px}
+  .wk.ok{background:#dcf6e4;color:#1c7a3d}
+  .wk.no{background:#fde8e8;color:#b42318}
+  .pchip{font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:12px;background:#fff3d6;color:#8a6100;cursor:pointer}
+  .pchip:hover{background:#ffe7a8}
+  .entry .tag.notes{background:#eef4fc;color:var(--blue-d);cursor:pointer}
+  .snack{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 14px 10px 18px;
+         border-radius:10px;font-size:14px;display:flex;gap:14px;align-items:center;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  .snack button{background:var(--yellow);color:var(--ink);border:none;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
@@ -122,16 +145,21 @@
 <main>
   <div class="tabs">
     <button class="tab active" data-view="raw">✍️ Πρώτη ύλη ανά τμήμα</button>
-    <button class="tab" data-view="posts">📣 Τελευταίες δράσεις</button>
+    <button class="tab" data-view="posts">📣 Δράσεις στο site</button>
   </div>
 
   <!-- ================= VIEW: ΠΡΩΤΗ ΥΛΗ ================= -->
   <section id="view-raw">
-    <div class="filterbar"><span class="fl">📅 Χρονιά</span><select id="rawYear"></select></div>
+    <div class="filterbar">
+      <span class="fl">📅 Χρονιά</span><select id="rawYear"></select>
+      <input type="search" class="search" id="rawSearch" placeholder="🔎 Αναζήτηση στις σημειώσεις…">
+    </div>
     <div class="chips" id="secChips"></div>
 
-    <div class="card form">
-      <h2 id="rawFormTitle">➕ Νέα σημείωση της εβδομάδας</h2>
+    <div id="rawPanels"></div>
+
+    <div class="card form" id="rawForm">
+      <h2 id="rawFormTitle">➕ Νέα σημείωση</h2>
       <input type="hidden" id="rawEditId" value="">
       <div class="row">
         <div id="rawSectionWrap">
@@ -168,21 +196,24 @@
     <div id="rawList"></div>
   </section>
 
-  <!-- ================= VIEW: ΤΕΛΕΥΤΑΙΕΣ ΔΡΑΣΕΙΣ (από την ιστοσελίδα) ================= -->
+  <!-- ================= VIEW: ΔΡΑΣΕΙΣ ΣΤΟ SITE ================= -->
   <section id="view-posts" class="hidden">
     <div class="note">📣 Οι δράσεις διαβάζονται <b>ζωντανά &amp; δημόσια</b> κατευθείαν από την ιστοσελίδα <b>76.life</b> (κατηγορία «ΔΡΑΣΕΙΣ»). Ό,τι δημοσιεύεται εκεί, εμφανίζεται εδώ.</div>
     <div class="filterbar">
       <span class="fl">📅 Χρονιά</span><select id="webYear"></select>
+      <input type="search" class="search" id="webSearch" placeholder="🔎 Αναζήτηση στις δράσεις…">
       <button class="btn sec sm" id="webReload">↻ Ανανέωση</button>
       <span class="fl" id="webState" style="margin-left:auto;font-weight:400"></span>
     </div>
+    <div class="chips" id="webChips"></div>
     <div id="webFeed"></div>
   </section>
 
-  <div style="text-align:center;color:var(--muted);font-size:12px;margin:30px 0 0">Έκδοση: <b id="verstamp">07 Σεπτεμβρίου 2026, 19:03</b></div>
+  <div style="text-align:center;color:var(--muted);font-size:12px;margin:30px 0 0">Έκδοση: <b id="verstamp">09 Οκτωβρίου 2026, 00:43</b></div>
 </main>
 
 <div class="toast" id="toast"></div>
+<div class="snack hidden" id="snack"><span id="snackTxt"></span><button id="snackBtn">↩ Αναίρεση</button></div>
 
 <script>
 /* ============ ΡΥΘΜΙΣΗ ============ */
@@ -194,28 +225,42 @@ const SECTIONS = [
   { key:'Κοινότητα',  label:'Κοινότητα',  emoji:'🔵' },
   { key:'Εξτρα',      label:'Εξτρα',      emoji:'💜' },
 ];
-const SITE_URL = 'https://76.life';   // δημόσιο WordPress REST (δράσεις) — direct, χωρίς backend
-const DRASEIS_CAT = 29;               // κατηγορία «ΔΡΑΣΕΙΣ»
+const MAIN3 = ['Αγέλη','Ομάδα','Κοινότητα'];          // τα τμήματα που «οφείλουν» σημείωση κάθε Σάββατο
+const SITE_URL = 'https://76.life';                     // δημόσιο WordPress REST — direct, χωρίς backend
+const DRASEIS_CAT = 29;                                 // κατηγορία «ΔΡΑΣΕΙΣ»
+const SUBCAT_SECTION = { draseisageli:'Αγέλη', draseisomada:'Ομάδα', draseiskoinotita:'Κοινότητα', draseissystima:'Σύστημα' };
+const WEB_SECTIONS = [
+  { key:'Αγέλη', label:'Αγέλη', emoji:'🟡' }, { key:'Ομάδα', label:'Ομάδα', emoji:'🟢' },
+  { key:'Κοινότητα', label:'Κοινότητα', emoji:'🔵' }, { key:'Σύστημα', label:'Σύστημα', emoji:'💙' },
+  { key:'ΟΛΑ', label:'Όλες', emoji:'⚜️' },
+];
 const GR_MONTHS = ['Ιανουαρίου','Φεβρουαρίου','Μαρτίου','Απριλίου','Μαΐου','Ιουνίου','Ιουλίου','Αυγούστου','Σεπτεμβρίου','Οκτωβρίου','Νοεμβρίου','Δεκεμβρίου'];
 const GR_MON_SH = ['Ιαν','Φεβ','Μαρ','Απρ','Μαΐ','Ιουν','Ιουλ','Αυγ','Σεπ','Οκτ','Νοε','Δεκ'];
 const GR_DAYS = ['Κυριακή','Δευτέρα','Τρίτη','Τετάρτη','Πέμπτη','Παρασκευή','Σάββατο'];
 
 let DATA = { raw:[] };
 let curSection = 'ΟΛΑ';
+let webSection = 'ΟΛΑ';
+const WEB = {};        // σκαυτική χρονιά -> [δράσεις]
+let CATMAP = null;     // id υποκατηγορίας -> τμήμα
 
 /* ============ ΒΟΗΘΗΤΙΚΑ ============ */
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
 function toast(msg, isErr){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); setTimeout(()=>t.className='toast',2600); }
-function iso(d){ return d.toISOString().slice(0,10); }
-/* Επιστρέφει YYYY-MM-DD είτε από «2026-02-07…» είτε από Date-string («Sat Feb 07 2026…» που φτιάχνει το Sheets). */
+/* τοπική ημερομηνία (όχι UTC — αλλιώς βράδυ Κύπρου γυρίζει μέρα) */
+function iso(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+/* YYYY-MM-DD είτε από «2026-02-07…» είτε από Date-string («Sat Feb 07 2026…») */
 function d10(s){
   s=String(s||'');
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
   const d=new Date(s);
-  if(!isNaN(d.getTime())) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!isNaN(d.getTime())) return iso(d);
   return s.slice(0,10);
 }
+function addDays(s,n){ const m=d10(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m) return s; const d=new Date(+m[1],+m[2]-1,+m[3]+n); return iso(d); }
+function isSaturday(s){ const m=d10(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return !!m && new Date(+m[1],+m[2]-1,+m[3]).getDay()===6; }
 function stripHtml(h){ const d=document.createElement('div'); d.innerHTML=h||''; return (d.textContent||d.innerText||'').replace(/\s+/g,' ').trim(); }
 function fmtDate(s){
   const m = d10(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -223,6 +268,7 @@ function fmtDate(s){
   const d = new Date(+m[1], +m[2]-1, +m[3]);
   return GR_DAYS[d.getDay()]+' '+(+m[3])+' '+GR_MONTHS[d.getMonth()]+' '+m[1];
 }
+function fmtShort(s){ const m=d10(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (+m[3])+' '+GR_MON_SH[+m[2]-1] : s; }
 function fmtRange(s,e){
   const a=d10(s), b=d10(e);
   if(!b || b===a) return fmtDate(s);
@@ -233,23 +279,26 @@ function fmtRange(s,e){
   if(ma[1]===mb[1]) return da+' '+GR_MON_SH[mia]+' – '+db+' '+GR_MON_SH[mib]+' '+mb[1];
   return da+' '+GR_MON_SH[mia]+' '+ma[1]+' – '+db+' '+GR_MON_SH[mib]+' '+mb[1];
 }
-function satOfThisWeek(){ const d=new Date(); const diff=6-d.getDay(); d.setDate(d.getDate()+diff); return d; }
+function satOfThisWeek(){ const d=new Date(); d.setDate(d.getDate()+(6-d.getDay())); return d; }
+function lastSaturday(){ const d=new Date(); d.setDate(d.getDate()-((d.getDay()+1)%7)); return iso(d); }
 function quickDate(q){ if(q==='today') return new Date(); const s=satOfThisWeek(); if(q==='lastSat') s.setDate(s.getDate()-7); return s; }
 function scoutYear(dateStr){
   const m=d10(dateStr).match(/^(\d{4})-(\d{2})/); if(!m) return '';
   const y=+m[1], mo=+m[2]; const start = mo>=8 ? y : y-1;
-  return start+'-'+String((start+1)%100).padStart(2,'0');
+  return start+'-'+pad((start+1)%100);
 }
 function curScoutYear(){ return scoutYear(iso(new Date())); }
+function entryEnd(r){ return d10(r['Έως']) || d10(r['Ημερομηνία']); }
 
-/* Οι δράσεις ξεκινούν με ημερομηνία — διάβασέ τη· αλλιώς πέσε στην ημ. δημοσίευσης. */
+/* Ελληνικά χωρίς τόνους/πεζά — για αναζήτηση */
+function normGr(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ς/g,'σ'); }
+
+/* Οι δράσεις ξεκινούν με ημερομηνία («07/02 …» ή «31/07-10/08 …») */
 const MON_GEN = {'ιανουαριου':1,'φεβρουαριου':2,'μαρτιου':3,'απριλιου':4,'μαιου':5,'ιουνιου':6,'ιουλιου':7,'αυγουστου':8,'σεπτεμβριου':9,'οκτωβριου':10,'νοεμβριου':11,'δεκεμβριου':12};
-function normGr(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 function parseTextDate(txt, tsISO){
   const fb = d10(tsISO);
   const t = String(txt||'').trim();
   if(!t) return fb;
-  // 1) Αριθμητικό «DD/MM» ή «DD/MM/YYYY» (ή με τελεία/παύλα) στην αρχή του τίτλου — η μορφή του 76.life
   let m = t.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?/);
   if(m){
     const day=+m[1], mon=+m[2];
@@ -259,25 +308,33 @@ function parseTextDate(txt, tsISO){
       else{
         yr = fb ? +fb.slice(0,4) : new Date().getFullYear();
         const fbMon = fb ? +fb.slice(5,7) : mon;
-        if(mon===12 && fbMon===1) yr -= 1; // δράση Δεκ, δημοσίευση Ιαν
+        if(mon===12 && fbMon===1) yr -= 1;
       }
-      return yr+'-'+String(mon).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+      return yr+'-'+pad(mon)+'-'+pad(day);
     }
   }
-  // 2) Ελληνικός μήνας με λέξη «07 Φεβρουαρίου 2026»
   const n = normGr(t);
   m = n.match(/(\d{1,2})\s*(?:[–\-]\s*\d{1,2}\s*)?([α-ω]+)(?:\s+(\d{4}))?/);
   if(m && MON_GEN[m[2]]){
     const day=+m[1], mon=MON_GEN[m[2]];
     const fbYr = fb ? +fb.slice(0,4) : new Date().getFullYear();
     let yr = m[3] ? +m[3] : fbYr;
-    if(m[3] && Math.abs(yr-fbYr) > 1) return fb; // εθνικές επέτειοι
-    if(day>=1 && day<=31) return yr+'-'+String(mon).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    if(m[3] && Math.abs(yr-fbYr) > 1) return fb;
+    if(day>=1 && day<=31) return yr+'-'+pad(mon)+'-'+pad(day);
   }
   return fb;
 }
+/* Τέλος εύρους στον τίτλο («31/07-10/08 …») — αλλιώς ίδια με την αρχή */
+function parseTextEnd(txt, start){
+  const m = String(txt||'').trim().match(/^\d{1,2}[\/.]\d{1,2}(?:[\/.]\d{2,4})?\s*[-–]\s*(\d{1,2})[\/.](\d{1,2})/);
+  if(!m) return start;
+  const sm=d10(start).match(/^(\d{4})-(\d{2})/); if(!sm) return start;
+  let yr=+sm[1]; const mon=+m[2], day=+m[1];
+  if(mon < +sm[2]) yr+=1;
+  return yr+'-'+pad(mon)+'-'+pad(day);
+}
 
-/* ============ API (fetch — δουλεύει με πολλά Google logins, χωρίς incognito) ============ */
+/* ============ API (fetch — δουλεύει με πολλά Google logins) ============ */
 async function api(params){
   if(!WEB_APP_URL || WEB_APP_URL.indexOf('PASTE_')===0) throw new Error('no-url');
   const q=Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
@@ -287,6 +344,52 @@ async function api(params){
 }
 function setStatus(state,txt){ $('#dot').className='dot '+state; $('#statusTxt').textContent=txt; }
 
+/* ============ ΔΡΑΣΕΙΣ: φόρτωση & αντιστοίχιση ============ */
+function yearBounds(sy){
+  const m=String(sy).match(/^(\d{4})-(\d{2})$/); if(!m) return ['',''];
+  const s=+m[1]; return [s+'-08-01T00:00:00', (s+1)+'-08-01T00:00:00'];
+}
+async function ensureCats(){
+  if(CATMAP) return;
+  CATMAP={};
+  try{
+    const cats=await fetch(SITE_URL+'/wp-json/wp/v2/categories?parent='+DRASEIS_CAT+'&per_page=100&_fields=id,slug').then(r=>r.json());
+    (cats||[]).forEach(c=>{ if(SUBCAT_SECTION[c.slug]) CATMAP[c.id]=SUBCAT_SECTION[c.slug]; });
+  }catch(e){}
+}
+function normalizeWeb(m){
+  const title=stripHtml((m.title && m.title.rendered) || '');
+  const s=parseTextDate(title, m.date);
+  const e=parseTextEnd(title, s);
+  const secs=[...new Set((m.categories||[]).map(id=>CATMAP[id]).filter(Boolean))];
+  return Object.assign(m,{ _title:title, _s:s, _e:e<s?s:e, _secs:secs, _text:normGr(title+' '+stripHtml((m.content&&m.content.rendered)||'')) });
+}
+async function fetchWebYear(y, force){
+  if(!y || y==='ΟΛΕΣ') return [];
+  if(WEB[y] && !force) return WEB[y];
+  const [aft,bef]=yearBounds(y);
+  const url=SITE_URL+'/wp-json/wp/v2/posts?categories='+DRASEIS_CAT+'&per_page=100&_embed=1&after='+aft+'&before='+bef;
+  const resp=await fetch(url,{headers:{'Accept':'application/json'}});
+  if(!resp.ok) throw new Error('http '+resp.status);
+  const items=await resp.json();
+  await ensureCats();
+  WEB[y]=(items||[]).map(normalizeWeb).sort((a,b)=>b._s.localeCompare(a._s));
+  return WEB[y];
+}
+function webLoaded(y){ return !!WEB[y]; }
+/* βρίσκει δράση που καλύπτει το διάστημα [s,e] (±1 μέρα: τα posts συχνά μπαίνουν Κυριακή) */
+function findPost(s,e){
+  e=e||s; const lo=addDays(s,-1), hi=addDays(e,1);
+  for(const y in WEB){ for(const m of WEB[y]){ if(m._s<=hi && m._e>=lo) return m; } }
+  return null;
+}
+async function ensureWebForRaw(){
+  const fy=$('#rawYear').value;
+  const years = fy==='ΟΛΕΣ' ? [...new Set(DATA.raw.map(r=>scoutYear(r['Ημερομηνία'])).filter(Boolean))] : [fy];
+  await Promise.all(years.map(y=>fetchWebYear(y).catch(()=>null)));
+}
+
+/* ============ ΦΟΡΤΩΣΗ ============ */
 async function loadAll(){
   setStatus('','Φόρτωση…');
   try{
@@ -295,11 +398,10 @@ async function loadAll(){
     else{ setStatus('off','Σφάλμα'); toast('Σφάλμα φόρτωσης',true); }
   }catch(err){
     setStatus('off', err.message==='no-url'?'Χωρίς σύνδεση (demo)':'Εκτός σύνδεσης');
-    if(err.message==='no-url') toast('Δεν έχει οριστεί ακόμη το WEB_APP_URL — δες το SETUP.',true);
   }
   fillYears(); renderRaw();
+  ensureWebForRaw().then(renderRaw);
 }
-
 function fillYears(){
   const set=new Set();
   DATA.raw.forEach(r=>{const y=scoutYear(r['Ημερομηνία']); if(y)set.add(y);});
@@ -312,16 +414,17 @@ function fillYears(){
 }
 
 /* ============ VIEW SWITCH ============ */
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  const v=t.dataset.view;
+function showView(v){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.view===v));
   $('#view-raw').classList.toggle('hidden', v!=='raw');
   $('#view-posts').classList.toggle('hidden', v!=='posts');
   if(v==='posts') loadWeb();
-});
-$('#rawYear').onchange=renderRaw;
-$('#webReload').onclick=loadWeb;
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showView(t.dataset.view));
+$('#rawYear').onchange=()=>{ renderRaw(); ensureWebForRaw().then(renderRaw); };
+$('#rawSearch').oninput=renderRaw;
+$('#webReload').onclick=()=>loadWeb(true);
+$('#webSearch').oninput=renderWeb;
 
 /* ============ ΠΡΩΤΗ ΥΛΗ ============ */
 function buildChips(){
@@ -333,32 +436,83 @@ function buildChips(){
   if(curSection!=='ΟΛΑ') sel.value=curSection;
   updateFormSection();
 }
-function secMeta(k){ return SECTIONS.find(s=>s.key===k)||{emoji:'•',label:k}; }
-/* Το ενεργό chip = το τμήμα της φόρμας. Το dropdown «Τμήμα» φαίνεται μόνο στο «Όλοι μαζί» ή σε επεξεργασία. */
+function secMeta(k){ return SECTIONS.find(s=>s.key===k)||WEB_SECTIONS.find(s=>s.key===k)||{emoji:'•',label:k}; }
+/* Το ενεργό chip = το τμήμα της φόρμας. Το dropdown «Τμήμα» μόνο στο «Όλοι μαζί» ή σε επεξεργασία. */
 function updateFormSection(){
   const wrap=$('#rawSectionWrap'); const editing=$('#rawEditId').value;
-  if(curSection==='ΟΛΑ' || editing){ if(wrap) wrap.style.display=''; }
-  else { $('#rawSection').value=curSection; if(wrap) wrap.style.display='none'; }
+  if(curSection==='ΟΛΑ' || editing){ wrap.style.display=''; }
+  else { $('#rawSection').value=curSection; wrap.style.display='none'; }
   if(!editing){
     const m = curSection==='ΟΛΑ' ? null : secMeta(curSection);
     $('#rawFormTitle').textContent = m ? ('➕ Νέα σημείωση — '+m.emoji+' '+m.label) : '➕ Νέα σημείωση (διάλεξε τμήμα)';
   }
 }
+/* σημειώσεις που καλύπτουν μια ημερομηνία */
+function entriesOn(day){ return DATA.raw.filter(r=>d10(r['Ημερομηνία'])<=day && entryEnd(r)>=day); }
+
+/* Πάνελ: (α) τελευταίο Σάββατο — ποιος έγραψε, (β) εκκρεμή posts */
+function renderPanels(rows){
+  const box=$('#rawPanels'); const fy=$('#rawYear').value; let html='';
+  const ls=lastSaturday(); const mo=+ls.slice(5,7);
+  if(mo!==7 && mo!==8 && (fy==='ΟΛΕΣ' || scoutYear(ls)===fy)){
+    const on=entriesOn(ls);
+    const secs = curSection==='ΟΛΑ' ? MAIN3 : (MAIN3.includes(curSection)?[curSection]:[]);
+    if(secs.length){
+      const marks=secs.map(k=>{ const m=secMeta(k); const ok=on.some(r=>r['Τμήμα']===k);
+        return `<span class="wk ${ok?'ok':'no'}">${m.emoji} ${esc(m.label)} ${ok?'✓':'✗'}</span>`; }).join('');
+      const missing=secs.filter(k=>!on.some(r=>r['Τμήμα']===k));
+      let post='';
+      if(webLoaded(scoutYear(ls))){ const p=findPost(ls,ls); post = p ? `<a class="badge ok" href="${esc(p.link)}" target="_blank" rel="noopener">✓ ανέβηκε στο site</a>` : `<span class="badge warn">⏳ δεν ανέβηκε ακόμα</span>`; }
+      const cta = missing.length ? `<button class="btn sm" id="writeLastSat">✍️ Γράψε για ${esc(fmtShort(ls))}</button>` : '';
+      html+=`<div class="card panel"><div class="ptitle">📌 Τελευταίο Σάββατο — ${esc(fmtDate(ls))} ${post}</div>
+        <div class="wkrow">${marks}</div>${missing.length?`<div class="hint">Λείπει σημείωση από: ${missing.map(k=>esc(secMeta(k).label)).join(', ')}</div>`:''}${cta}</div>`;
+    }
+  }
+  const years=[...new Set(rows.map(r=>scoutYear(r['Ημερομηνία'])))];
+  if(rows.length && years.every(webLoaded)){
+    const dates=[...new Set(rows.map(r=>d10(r['Ημερομηνία'])))].sort().reverse();
+    const pend=dates.filter(d=>{ const ends=rows.filter(r=>d10(r['Ημερομηνία'])===d).map(entryEnd).sort(); return !findPost(d, ends[ends.length-1]||d); });
+    if(pend.length){
+      html+=`<div class="card panel pend"><div class="ptitle">⏳ Εκκρεμούν posts — ${pend.length} ${pend.length===1?'ημερομηνία':'ημερομηνίες'} με σημειώσεις που δεν έχουν ανέβει</div>
+        <div class="wkrow">${pend.map(d=>`<span class="pchip" data-go="${d}">${esc(fmtShort(d))}</span>`).join('')}</div></div>`;
+    } else {
+      html+=`<div class="card panel done"><div class="ptitle">✓ Όλες οι σημειώσεις αυτού του φίλτρου έχουν ανέβει στο site</div></div>`;
+    }
+  }
+  box.innerHTML=html;
+  box.querySelectorAll('[data-go]').forEach(c=>c.onclick=()=>{ const el=document.getElementById('d-'+c.dataset.go); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); });
+  const w=$('#writeLastSat'); if(w) w.onclick=()=>{ resetRaw(); $('#rawDate').value=ls; $('#rawText').focus(); $('#rawForm').scrollIntoView({behavior:'smooth'}); };
+}
 
 function renderRaw(){
   const list=$('#rawList');
   const fy=$('#rawYear').value;
+  const q=normGr($('#rawSearch').value.trim());
   let rows=DATA.raw.slice();
   if(curSection!=='ΟΛΑ') rows=rows.filter(r=>r['Τμήμα']===curSection);
   if(fy && fy!=='ΟΛΕΣ') rows=rows.filter(r=>scoutYear(r['Ημερομηνία'])===fy);
+  if(!q) renderPanels(rows); else $('#rawPanels').innerHTML='';
+  if(q) rows=rows.filter(r=>normGr([r['Κείμενο'],r['Τίτλος'],r['Συντάκτης'],r['Τμήμα']].join(' ')).includes(q));
   rows.sort((a,b)=> d10(b['Ημερομηνία']).localeCompare(d10(a['Ημερομηνία'])) || (b['Καταχώρηση']||'').localeCompare(a['Καταχώρηση']||''));
-  if(!rows.length){ list.innerHTML='<div class="card"><div class="empty">Καμία σημείωση για αυτό το φίλτρο.</div></div>'; return; }
+  if(!rows.length){ list.innerHTML='<div class="card"><div class="empty">'+(q?'Δεν βρέθηκε τίποτα.':'Καμία σημείωση για αυτό το φίλτρο.')+'</div></div>'; return; }
   const groups={};
   rows.forEach(r=>{ const d=d10(r['Ημερομηνία'])||'—'; (groups[d]=groups[d]||[]).push(r); });
   const dates=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
   let html='';
   dates.forEach(d=>{
-    html+=`<div class="datehead">${esc(fmtDate(d)||d)}</div>`;
+    let badges='';
+    if(webLoaded(scoutYear(d))){
+      const ends=groups[d].map(entryEnd).sort(); const p=findPost(d, ends[ends.length-1]||d);
+      badges += p ? `<a class="badge ok" href="${esc(p.link)}" target="_blank" rel="noopener">✓ στο site</a>` : `<span class="badge warn">⏳ εκκρεμεί post</span>`;
+    }
+    if(curSection==='ΟΛΑ' && !q && isSaturday(d)){
+      const all=entriesOn(d);
+      if(all.some(r=>MAIN3.includes(r['Τμήμα']))){
+        const miss=MAIN3.filter(k=>!all.some(r=>r['Τμήμα']===k));
+        if(miss.length) badges += `<span class="badge miss">λείπει: ${miss.map(k=>secMeta(k).emoji+' '+esc(k)).join(', ')}</span>`;
+      }
+    }
+    html+=`<div class="datehead" id="d-${d}"><span>${esc(fmtDate(d)||d)}</span>${badges}</div>`;
     groups[d].forEach(r=>{
       const m=secMeta(r['Τμήμα']);
       const hasRange = d10(r['Έως']) && d10(r['Έως'])!==d10(r['Ημερομηνία']);
@@ -371,8 +525,8 @@ function renderRaw(){
         <div class="body">${esc(r['Κείμενο'])}</div>
         <div class="meta">${r['Συντάκτης']?'✍️ '+esc(r['Συντάκτης'])+' · ':''}${r['Καταχώρηση']?new Date(r['Καταχώρηση']).toLocaleString('el-GR'):''}</div>
         <div class="acts">
-          <button data-edit="${r['ID']}">✎ Επεξεργασία</button>
-          <button data-del="${r['ID']}">🗑 Διαγραφή</button>
+          <button data-edit="${esc(r['ID'])}">✎ Επεξεργασία</button>
+          <button data-del="${esc(r['ID'])}">🗑 Διαγραφή</button>
         </div></div>`;
     });
   });
@@ -393,7 +547,7 @@ function editRaw(id){
   $('#rawFormTitle').textContent='✎ Επεξεργασία σημείωσης';
   $('#rawCancel').classList.remove('hidden');
   updateFormSection();
-  window.scrollTo({top:0,behavior:'smooth'});
+  $('#rawForm').scrollIntoView({behavior:'smooth'});
 }
 function resetRaw(){
   $('#rawEditId').value=''; $('#rawTitle').value=''; $('#rawText').value=''; $('#rawAuthor').value=''; $('#rawDateEnd').value='';
@@ -402,64 +556,78 @@ function resetRaw(){
 $('#rawCancel').onclick=resetRaw;
 document.querySelectorAll('#view-raw .qbtn').forEach(b=>b.onclick=()=>{ $('#rawDate').value=iso(quickDate(b.dataset.q)); });
 
+function payloadOf(r){
+  return { 'Τμήμα':r['Τμήμα'], 'Ημερομηνία':d10(r['Ημερομηνία']), 'Έως':d10(r['Έως']),
+           'Τίτλος':r['Τίτλος']||'', 'Κείμενο':r['Κείμενο']||'', 'Συντάκτης':r['Συντάκτης']||'' };
+}
 $('#rawSave').onclick=async()=>{
   const text=$('#rawText').value.trim();
   if(!text){ toast('Γράψε την πρώτη ύλη πρώτα',true); return; }
+  if(!$('#rawDate').value){ toast('Βάλε ημερομηνία',true); return; }
   const id=$('#rawEditId').value;
   const payload={ 'Τμήμα':$('#rawSection').value, 'Ημερομηνία':$('#rawDate').value, 'Έως':$('#rawDateEnd').value,
                   'Τίτλος':$('#rawTitle').value.trim(), 'Κείμενο':text, 'Συντάκτης':$('#rawAuthor').value.trim() };
   const btn=$('#rawSave'); btn.disabled=true; btn.textContent='Αποθήκευση…';
   try{
-    if(id){ await api(Object.assign({action:'update',ID:id},payload));
+    if(id){ const r=await api(Object.assign({action:'update',ID:id},payload)); if(!r||!r.ok) throw new Error((r&&r.error)||'update');
             Object.assign(DATA.raw.find(x=>x['ID']===id), payload); }
-    else{ const r=await api(Object.assign({action:'add'},payload));
-          DATA.raw.push(Object.assign({ID:r&&r.id||('tmp'+Date.now()),'Καταχώρηση':new Date().toISOString()},payload)); }
-    toast('Αποθηκεύτηκε ✓'); resetRaw(); fillYears(); renderRaw();
+    else{ const r=await api(Object.assign({action:'add'},payload)); if(!r||!r.ok) throw new Error((r&&r.error)||'add');
+          DATA.raw.push(Object.assign({ID:r.id,'Καταχώρηση':new Date().toISOString()},payload)); }
+    toast('Αποθηκεύτηκε ✓'); resetRaw(); fillYears(); renderRaw(); ensureWebForRaw().then(renderRaw);
   }catch(err){ toast('Δεν αποθηκεύτηκε ('+err.message+')',true); }
   btn.disabled=false; btn.textContent='💾 Αποθήκευση';
 };
 
+/* ============ ΔΙΑΓΡΑΦΗ (με PIN) + ΑΝΑΙΡΕΣΗ ============ */
+let snackTimer=null;
+function snack(msg, onUndo){
+  $('#snackTxt').textContent=msg; $('#snack').classList.remove('hidden');
+  $('#snackBtn').onclick=async()=>{ $('#snack').classList.add('hidden'); clearTimeout(snackTimer); await onUndo(); };
+  clearTimeout(snackTimer); snackTimer=setTimeout(()=>$('#snack').classList.add('hidden'),9000);
+}
 async function delEntry(id){
-  if(!confirm('Σίγουρα διαγραφή αυτής της σημείωσης;')) return;
+  const r0=DATA.raw.find(x=>x['ID']===id); if(!r0) return;
+  const pin=prompt('Διαγραφή σημείωσης — βάλε το PIN:');
+  if(pin===null) return;
   try{
-    await api({action:'delete',ID:id});
-    DATA.raw=DATA.raw.filter(x=>x['ID']!==id); fillYears(); renderRaw(); toast('Διαγράφηκε');
+    const r=await api({action:'delete',ID:id,pin:pin.trim()});
+    if(!r||!r.ok){ toast(r&&r.error==='pin'?'Λάθος PIN':'Δεν διαγράφηκε',true); return; }
+    DATA.raw=DATA.raw.filter(x=>x['ID']!==id); fillYears(); renderRaw();
+    snack('Η σημείωση διαγράφηκε.', async()=>{
+      try{ const a=await api(Object.assign({action:'add'},payloadOf(r0))); if(!a||!a.ok) throw new Error('add');
+           DATA.raw.push(Object.assign({},r0,{ID:a.id})); fillYears(); renderRaw(); toast('Επαναφέρθηκε ✓'); }
+      catch(e){ toast('Δεν έγινε επαναφορά',true); }
+    });
   }catch(err){ toast('Δεν διαγράφηκε ('+err.message+')',true); }
 }
 
-/* ============ ΤΕΛΕΥΤΑΙΕΣ ΔΡΑΣΕΙΣ (direct από 76.life) ============ */
-/* Γεμίζει τον επιλογέα χρονιάς: από 2024-25 έως την τρέχουσα (νεότερη πρώτη). */
+/* ============ ΔΡΑΣΕΙΣ ΣΤΟ SITE ============ */
 function fillWebYears(){
   const cur=curScoutYear(); const curStart=+cur.slice(0,4);
   const el=$('#webYear'); const opts=[];
-  for(let y=curStart; y>=2024; y--){ opts.push(y+'-'+String((y+1)%100).padStart(2,'0')); }
+  for(let y=curStart; y>=2024; y--){ opts.push(y+'-'+pad((y+1)%100)); }
   el.innerHTML=opts.map(y=>`<option value="${y}">${y}</option>`).join('');
   el.value=cur;
 }
-/* Σκαυτική χρονιά -> [after, before] (ISO) για το WP REST. */
-function yearBounds(sy){
-  const m=String(sy).match(/^(\d{4})-(\d{2})$/); if(!m) return ['',''];
-  const s=+m[1]; return [s+'-08-01T00:00:00', (s+1)+'-08-01T00:00:00'];
+$('#webYear').onchange=()=>loadWeb();
+function buildWebChips(){
+  const box=$('#webChips');
+  box.innerHTML=WEB_SECTIONS.map(s=>`<button class="chip ${s.key===webSection?'active':''}" data-k="${s.key}">${s.emoji} ${esc(s.label)}</button>`).join('');
+  box.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ webSection=c.dataset.k; buildWebChips(); renderWeb(); });
 }
-async function loadWeb(){
-  const feed=$('#webFeed'), st=$('#webState');
+async function loadWeb(force){
+  const st=$('#webState'); const y=$('#webYear').value;
   st.textContent='φόρτωση…';
-  const [aft,bef]=yearBounds($('#webYear').value);
-  let url=SITE_URL+'/wp-json/wp/v2/posts?categories='+DRASEIS_CAT+'&per_page=30&_embed=1';
-  if(aft&&bef) url+='&after='+aft+'&before='+bef;
   try{
-    const resp=await fetch(url,{headers:{'Accept':'application/json'}});
-    if(!resp.ok){ feed.innerHTML=''; st.textContent='(σφάλμα HTTP '+resp.status+')'; return; }
-    const items=await resp.json();
-    st.textContent='από 76.life · '+new Date().toLocaleTimeString('el-GR');
-    renderWeb(items||[]);
+    await fetchWebYear(y, force);
+    st.textContent='από 76.life · '+new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
+    renderWeb();
+    if(force) renderRaw();
   }catch(err){
-    feed.innerHTML='<div class="card"><div class="empty">Δεν φόρτωσαν οι δράσεις (έλεγξε σύνδεση/76.life).</div></div>';
+    $('#webFeed').innerHTML='<div class="card"><div class="empty">Δεν φόρτωσαν οι δράσεις (έλεγξε σύνδεση/76.life).</div></div>';
     st.textContent='(εκτός σύνδεσης)';
   }
 }
-$('#webYear') && ($('#webYear').onchange=loadWeb);
-/* Καθαρίζει HTML από επικίνδυνα στοιχεία (η ιστοσελίδα είναι δική μας, κρατάμε κείμενο/εικόνες/παραγράφους). */
 function sanitizeHtml(h){
   return String(h||'')
     .replace(/<script[\s\S]*?<\/script>/gi,'')
@@ -474,48 +642,49 @@ function featuredImg(m){
     if(!fm) return '';
     let url=fm.source_url;
     const s=fm.media_details && fm.media_details.sizes;
-    if(s){ const pick=s.medium_large||s.large||s.medium||s.full; if(pick&&pick.source_url) url=pick.source_url; }
+    if(s){ const pick=s.medium||s.medium_large||s.thumbnail||s.large||s.full; if(pick&&pick.source_url) url=pick.source_url; }
     return url ? `<img class="webthumb" src="${esc(url)}" alt="" loading="lazy">` : '';
   }catch(e){ return ''; }
 }
-function renderWeb(items){
-  const feed=$('#webFeed');
-  if(!items.length){ feed.innerHTML='<div class="card"><div class="empty">Καμία δράση.</div></div>'; return; }
-  items.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+function renderWeb(){
+  const feed=$('#webFeed'); const y=$('#webYear').value;
+  let items=(WEB[y]||[]).slice();
+  if(webSection!=='ΟΛΑ') items=items.filter(m=>m._secs.includes(webSection));
+  const q=normGr($('#webSearch').value.trim());
+  if(q) items=items.filter(m=>m._text.includes(q));
+  if(!items.length){ feed.innerHTML='<div class="card"><div class="empty">'+(WEB[y]?(q?'Δεν βρέθηκε τίποτα.':'Καμία δράση για αυτό το φίλτρο.'):'')+'</div></div>'; return; }
   feed.innerHTML=items.map(m=>{
-    const title=stripHtml((m.title && m.title.rendered) || '');
-    const d=parseTextDate(title, m.date);
-    const bodyHtml=sanitizeHtml((m.content && m.content.rendered) || (m.excerpt && m.excerpt.rendered) || '');
+    const notes=DATA.raw.filter(r=>d10(r['Ημερομηνία'])<=addDays(m._e,1) && entryEnd(r)>=addDays(m._s,-1));
+    const secTags=m._secs.map(k=>`<span class="tag">${secMeta(k).emoji} ${esc(k)}</span>`).join('');
     return `<div class="entry web">
       <div class="top">
-        <span class="date">${esc(fmtDate(d)||'—')}</span>
-        <span class="tag">ιστοσελίδα</span>
+        <span class="date">${esc(fmtRange(m._s,m._e)||'—')}</span>
+        ${secTags}
+        ${notes.length?`<span class="tag notes" data-goraw="${m._s}">📝 ${notes.length} ${notes.length===1?'σημείωση':'σημειώσεις'} πρώτης ύλης</span>`:''}
       </div>
-      <div class="title">${esc(title)}</div>
+      <div class="title">${esc(m._title)}</div>
       ${featuredImg(m)}
-      <div class="webbody">${bodyHtml}</div>
+      <div class="webbody">${sanitizeHtml((m.content && m.content.rendered) || (m.excerpt && m.excerpt.rendered) || '')}</div>
       <div class="acts">
         ${m.link?`<a href="${esc(m.link)}" target="_blank" rel="noopener">άνοιγμα στην ιστοσελίδα ↗</a>`:''}
       </div></div>`;
   }).join('');
+  feed.querySelectorAll('[data-goraw]').forEach(t=>t.onclick=()=>{
+    const d=t.dataset.goraw;
+    curSection='ΟΛΑ'; $('#rawSearch').value=''; $('#rawYear').value=scoutYear(d)||$('#rawYear').value;
+    buildChips(); showView('raw'); renderRaw();
+    setTimeout(()=>{ const lo=addDays(d,-1), hi=addDays(d,1);
+      const el=[...document.querySelectorAll('.datehead')].find(h=>{ const x=h.id.slice(2); return x>=lo && x<=hi; });
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },80);
+  });
 }
 
 /* ============ INIT ============ */
 buildChips();
+buildWebChips();
 $('#rawDate').value=iso(new Date());
 fillWebYears();
 loadAll();
-</script>
-<script>
-/* Καθαρίζει το _gl (linker του Google Analytics) από τη διεύθυνση, ώστε ο
-   σύνδεσμος που αντιγράφει κανείς να μην κουβαλά αναγνωριστικό συσκευής.
-   Δεν αγγίζει καμία άλλη παράμετρο — το ?a= και το ?team= μένουν ακέραια. */
-(function(){try{
-  var u=new URL(location.href),n=0;
-  ["_gl","_ga"].forEach(function(k){ if(u.searchParams.has(k)){u.searchParams.delete(k);n++;} });
-  if(n){ var q=u.searchParams.toString();
-    history.replaceState(null,"",u.pathname+(q?"?"+q:"")+u.hash); }
-}catch(e){}})();
 </script>
 </body>
 </html>
