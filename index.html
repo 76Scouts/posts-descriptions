@@ -185,6 +185,7 @@
       <input type="text" id="rawTitle" placeholder="π.χ. Εκπαίδευση Τοπογραφίας — έναρξη / Διήμερο ΟΠ Λόφου">
       <label>Πρώτη ύλη — τι κάναμε &amp; τι μάθαμε <span style="color:var(--err)">*</span></label>
       <textarea id="rawText" placeholder="Γράψε με απλά λόγια τι έγινε και το «γιατί»/τη μάθηση, ώστε να μη χαθεί η πληροφορία μέχρι το post."></textarea>
+      <div style="font-size:12px;color:var(--muted,#666);margin:-2px 0 8px">Γράψτε τι κάναμε, όχι ποιος. Μη γράφετε ονόματα παιδιών ή στοιχεία υγείας.</div>
       <label>Ποιος το γράφει <span style="font-weight:400">(προαιρετικό)</span></label>
       <input type="text" id="rawAuthor" placeholder="όνομα βαθμοφόρου">
       <div>
@@ -335,12 +336,22 @@ function parseTextEnd(txt, start){
 }
 
 /* ============ API (fetch — δουλεύει με πολλά Google logins) ============ */
+/* Κωδικός ανάγνωσης (Α11, 22/11/2026): οι σημειώσεις δεν είναι δημόσιες. Ο κωδικός μένει μόνο σε αυτή την καρτέλα. */
+function getKey(){
+  let k=''; try{ k=sessionStorage.getItem('pd_key')||''; }catch(e){}
+  if(!k){ k=(prompt('Κωδικός σημειώσεων (τον δίνει ο Αρχηγός Συστήματος):')||'').trim(); try{ if(k) sessionStorage.setItem('pd_key',k); }catch(e){} }
+  return k;
+}
+function clearKey(){ try{ sessionStorage.removeItem('pd_key'); }catch(e){} }
 async function api(params){
   if(!WEB_APP_URL || WEB_APP_URL.indexOf('PASTE_')===0) throw new Error('no-url');
+  params=Object.assign({key:getKey()}, params);
   const q=Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
   const resp=await fetch(WEB_APP_URL+'?'+q, { method:'GET' });
   if(!resp.ok) throw new Error('http '+resp.status);
-  return await resp.json();
+  const j=await resp.json();
+  if(j && j.ok===false && j.error==='key'){ clearKey(); toast('Λάθος ή κενός κωδικός — ανανέωσε τη σελίδα',true); }
+  return j;
 }
 function setStatus(state,txt){ $('#dot').className='dot '+state; $('#statusTxt').textContent=txt; }
 
@@ -395,6 +406,7 @@ async function loadAll(){
   try{
     const r=await api({action:'list'});
     if(r&&r.ok){ DATA.raw=r.raw||[]; setStatus('on','Συνδεδεμένο'); }
+    else if(r&&r.error==='key'){ setStatus('off','Χρειάζεται κωδικός'); }
     else{ setStatus('off','Σφάλμα'); toast('Σφάλμα φόρτωσης',true); }
   }catch(err){
     setStatus('off', err.message==='no-url'?'Χωρίς σύνδεση (demo)':'Εκτός σύνδεσης');
@@ -686,5 +698,6 @@ $('#rawDate').value=iso(new Date());
 fillWebYears();
 loadAll();
 </script>
+<footer style="text-align:center;font-size:12px;color:#777;padding:18px 10px 26px">76ο Σύστημα Προσκόπων Στροβόλου · Όλες οι Πολιτικές του 76ου → <a href="https://76.life/privacy/" target="_blank" rel="noopener">76.life/privacy</a></footer>
 </body>
 </html>
