@@ -336,21 +336,31 @@ function parseTextEnd(txt, start){
 }
 
 /* ============ API (fetch — δουλεύει με πολλά Google logins) ============ */
-/* Κωδικός ανάγνωσης (Α11, 22/11/2026): οι σημειώσεις δεν είναι δημόσιες. Ο κωδικός μένει μόνο σε αυτή την καρτέλα. */
-function getKey(){
-  let k=''; try{ k=sessionStorage.getItem('pd_key')||''; }catch(e){}
-  if(!k){ k=(prompt('Κωδικός σημειώσεων (τον δίνει ο Αρχηγός Συστήματος):')||'').trim(); try{ if(k) sessionStorage.setItem('pd_key',k); }catch(e){} }
+/* Κωδικός ανάγνωσης (Α11, 22/11/2026): οι σημειώσεις δεν είναι δημόσιες.
+   Η σελίδα ζητά κωδικό ΜΟΝΟ όταν ο backend τον απαιτεί (απάντηση error:"key").
+   Έτσι ο παλιός backend δουλεύει χωρίς παράθυρο, και ο νέος (v2) το ενεργοποιεί μόνος του.
+   Ο κωδικός μένει μόνο σε αυτή την καρτέλα. */
+function storedKey(){ try{ return sessionStorage.getItem('pd_key')||''; }catch(e){ return ''; } }
+function askKey(){
+  const k=(prompt('Κωδικός σημειώσεων (τον δίνει ο Αρχηγός Συστήματος):')||'').trim();
+  try{ if(k) sessionStorage.setItem('pd_key',k); }catch(e){}
   return k;
 }
 function clearKey(){ try{ sessionStorage.removeItem('pd_key'); }catch(e){} }
-async function api(params){
-  if(!WEB_APP_URL || WEB_APP_URL.indexOf('PASTE_')===0) throw new Error('no-url');
-  params=Object.assign({key:getKey()}, params);
-  const q=Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
+async function apiCall(params,key){
+  const all=Object.assign({}, params, key?{key:key}:{});
+  const q=Object.keys(all).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(all[k]==null?'':all[k])).join('&');
   const resp=await fetch(WEB_APP_URL+'?'+q, { method:'GET' });
   if(!resp.ok) throw new Error('http '+resp.status);
-  const j=await resp.json();
-  if(j && j.ok===false && j.error==='key'){ clearKey(); toast('Λάθος ή κενός κωδικός — ανανέωσε τη σελίδα',true); }
+  return resp.json();
+}
+async function api(params){
+  if(!WEB_APP_URL || WEB_APP_URL.indexOf('PASTE_')===0) throw new Error('no-url');
+  let j=await apiCall(params, storedKey());
+  if(j && j.ok===false && j.error==='key'){
+    clearKey(); const k=askKey();
+    if(k){ j=await apiCall(params,k); if(j && j.ok===false && j.error==='key'){ clearKey(); toast('Λάθος κωδικός — ανανέωσε τη σελίδα',true); } }
+  }
   return j;
 }
 function setStatus(state,txt){ $('#dot').className='dot '+state; $('#statusTxt').textContent=txt; }
